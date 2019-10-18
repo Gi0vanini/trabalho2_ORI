@@ -125,21 +125,66 @@ int tamanho_registro_is;
   * de registros. */
 int carregar_arquivo();
 
+/* Recupera do arquivo o registro com o rrn informado e retorna os dados na
+ * struct Carona */
+Carona recuperar_registro(int rrn);
+
+/* Exibe a Carona */
+int exibir_registro(int rrn);
+
+/*Gera Chave da struct Carona*/
+void gerarChave(Carona *novo);
+
+
+/* CRIAÇÃO DE ÍNDICES */
+
 /* (Re)faz o Cria iprimary*/
 void criar_iprimary(Indice *iprimary);
 
 /* (Re)faz o índice de Caronas  */
 void criar_iride(Indice *iride);
 
-/*Escreve um nó da árvore no arquivo de índice,
-* O terceiro parametro serve para informar qual indice se trata */
-void write_btree(void *salvar, int rrn, char ip);
+
+/* FUNÇÕES DE APOIO */
 
 /*Lê um nó do arquivo de índice e retorna na estrutura*/
 void *read_btree(int rrn, int ip);
 
 /* Aloca dinamicamente os vetores de chaves e descendentes */
 void *criar_no(char ip);
+
+/* Libera o no node da memória principal */
+void libera_no(void *node, char ip);
+
+
+/* INSERÇÃO */
+
+/*Realiza os scanfs na struct Carona*/
+void ler_entrada(char *registro, Carona *novo);
+
+/* Insere um novo registro na Árvore B */
+void insere_chave_ip(Indice *iprimary, Chave_ip chave);
+
+/*Escreve um nó da árvore no arquivo de índice,
+* O terceiro parametro serve para informar qual indice se trata */
+void write_btree(void *salvar, int rrn, char ip);
+
+/* Função auxiliar para ser chamada recursivamente, inserir as novas chaves nas
+ * folhas e tratar overflow no retorno da recursão. */
+int insere_aux_ip(int noderrn, Chave_ip *chave);
+int insere_aux_is(int noderrn, Chave_is *chave);
+
+/* Função auxiliar que ordena as chaves em esq + a chave a ser inserida e divide
+ * entre os nós esq e dir. Retorna o novo nó à direita, a chave promovida e seu
+ * descendente direito, que pode ser nulo, caso a nó seja folha. */
+int divide_no_ip(int rrnesq, Chave_ip *chave, int desc_dir_rrn);
+int divide_no_is(int rrnesq, Chave_is *chave, int desc_dir_rrn);
+
+
+/* BUSCAS */
+
+/* Atualiza os dois índices com o novo registro inserido */
+void inserir_registro_indices(Indice *iprimary, Indice *iride, Carona j);
 
 /* Percorre a arvore e retorna o RRN da chave informada.  Retorna -1, caso não
  * encontrada. */
@@ -149,29 +194,20 @@ int buscar_chave_ip(int noderrn, char *pk, int exibir_caminho);
  * encontrada. */
 char *buscar_chave_is(const int noderrn, const char *titulo, const int exibir_caminho);
 
-/* Realiza percurso em-ordem imprimindo todas as caronas na ordem lexicografica do destino e data/hora e o
- * nível de cada nó (raiz = nível 1) */
-int imprimir_arvore_is(int noderrn, int nivel);
 
-/*Gera Chave da struct Carona*/
-void gerarChave(Carona *novo);
-
-/* Função auxiliar que ordena as chaves em esq + a chave a ser inserida e divide
- * entre os nós esq e dir. Retorna o novo nó à direita, a chave promovida e seu
- * descendente direito, que pode ser nulo, caso a nó seja folha. */
-int divide_no_ip(int rrnesq, Chave_ip *chave, int desc_dir_rrn);
-int divide_no_is(int rrnesq, Chave_is *chave, int desc_dir_rrn);
+/* LISTAGEM */
 
 /* Lista todos os registros não marcados para remoção */
 void listar(Indice iprimary, Indice iride);
+
+/* Realiza percurso em-ordem imprimindo todas as caronas na ordem lexicografica do destino e data/hora e o
+ * nível de cada nó (raiz = nível 1) */
+int imprimir_arvore_is(int noderrn, int nivel);
 
 /* Realiza percurso pré-ordem imprimindo as chaves primárias dos registros e o
  * nível de cada nó (raiz = nível 1) */
 int imprimir_arvore_ip(int noderrn, int nivel);
 
-/* Recupera do arquivo o registro com o rrn informado e retorna os dados na
- * struct Carona */
-Carona recuperar_registro(int rrn);
 
 /********************FUNÇÕES DO MENU*********************/
 void cadastrar(Indice *iprimary, Indice *iride);
@@ -184,24 +220,6 @@ void listar(Indice iprimary, Indice iride);
 
 /*******************************************************/
 
-void libera_no(void *node, char ip);
-
-/*Realiza os scanfs na struct Carona*/
-void ler_entrada(char *registro, Carona *novo);
-
-/* Atualiza os dois índices com o novo registro inserido */
-void inserir_registro_indices(Indice *iprimary, Indice *iride, Carona j);
-
-/* Insere um novo registro na Árvore B */
-void insere_chave_ip(Indice *iprimary, Chave_ip chave);
-
-/* Função auxiliar para ser chamada recursivamente, inserir as novas chaves nas
- * folhas e tratar overflow no retorno da recursão. */
-int insere_aux_ip(int noderrn, Chave_ip *chave);
-int insere_aux_is(int noderrn, Chave_is *chave);
-
-/* VOCÊS NÃO NECESSARIAMENTE PRECISAM USAR TODAS ESSAS FUNÇÕES, É MAIS PARA TEREM UMA BASE MESMO, 
- * PODEM CRIAR SUAS PRÓPRIAS FUNÇÕES SE PREFERIREM */
 
 int main()
 {
@@ -294,15 +312,13 @@ int main()
 
 /* Recebe do usuário uma string simulando o arquivo completo e retorna o número
  * de registros. */
-int carregar_arquivo()
-{
+int carregar_arquivo(){
 	scanf("%[^\n]\n", ARQUIVO);
 	return strlen(ARQUIVO) / TAM_REGISTRO;
 }
 
 /* Exibe a Carona */
-int exibir_registro(int rrn)
-{
+int exibir_registro(int rrn){
 	if (rrn < 0)
 		return 0;
 
@@ -342,8 +358,7 @@ int exibir_registro(int rrn)
 
 /* Recupera do arquivo o registro com o rrn informado e retorna os dados na
  * struct Carona */
-Carona recuperar_registro(int rrn)
-{
+Carona recuperar_registro(int rrn){
 
 	char temp[257], *p;
 	strncpy(temp, ARQUIVO + ((rrn)*TAM_REGISTRO), TAM_REGISTRO);
@@ -376,4 +391,162 @@ Carona recuperar_registro(int rrn)
 	gerarChave(&j);
 
 	return j;
+}
+
+/* Gera uma chave primária para a struct Carona novo */
+void gerarChave(Carona *novo){
+    // Nome
+    novo->pk[0] = novo->nome[0];
+    // Placa
+    novo->pk[1] = novo->placa[0];
+    novo->pk[2] = novo->placa[1];
+    novo->pk[3] = novo->placa[2];
+    // Data
+    novo->pk[4] = novo->data[0];
+    novo->pk[5] = novo->data[1];
+    novo->pk[6] = novo->data[3];
+    novo->pk[7] = novo->data[4];
+    // Hora
+    novo->pk[8] = novo->hora[0];
+    novo->pk[9] = novo->hora[1];
+    // \0
+    novo->pk[10] = '\0';
+
+    return;
+}
+
+/* ==========================================================================
+ * ============================= CRIAR ÍNDICES ==============================
+ * ========================================================================== */
+
+/* (Re)faz o Cria iprimary*/
+void criar_iprimary(Indice *iprimary){
+	return;
+}
+
+/* (Re)faz o índice de Caronas  */
+void criar_iride(Indice *iride){
+	return;
+}
+
+/* ==========================================================================
+ * =========================== FUNÇÕES DE APOIO =============================
+ * ========================================================================== */
+
+/*Lê um nó do arquivo de índice e retorna na estrutura*/
+void *read_btree(int rrn, int ip){
+
+}
+
+/* Aloca dinamicamente os vetores de chaves e descendentes */
+void *criar_no(char ip){
+
+}
+
+/* Libera o no node da memória principal */
+void libera_no(void *node, char ip){
+	
+}
+
+/* ==========================================================================
+ * ============================ FUNÇÕES DO MENU =============================
+ * ========================================================================== */
+
+void cadastrar(Indice *iprimary, Indice *iride){
+
+}
+
+int alterar(Indice iprimary){
+
+}
+
+void buscar(Indice iprimary, Indice iride){
+
+}
+
+void listar(Indice iprimary, Indice iride){
+
+}
+
+/* ==========================================================================
+ * =============================== INSERÇÕES ================================
+ * ========================================================================== */
+
+/*Realiza os scanfs na struct Carona*/
+void ler_entrada(char *registro, Carona *novo){
+
+}
+
+/* Insere um novo registro na Árvore B */
+void insere_chave_ip(Indice *iprimary, Chave_ip chave){
+
+}
+
+/*Escreve um nó da árvore no arquivo de índice,
+* O terceiro parametro serve para informar qual indice se trata */
+void write_btree(void *salvar, int rrn, char ip){
+
+}
+
+/* Função auxiliar para ser chamada recursivamente, inserir as novas chaves nas
+ * folhas e tratar overflow no retorno da recursão. */
+int insere_aux_ip(int noderrn, Chave_ip *chave){
+
+}
+
+int insere_aux_is(int noderrn, Chave_is *chave){
+
+}
+
+/* Função auxiliar que ordena as chaves em esq + a chave a ser inserida e divide
+ * entre os nós esq e dir. Retorna o novo nó à direita, a chave promovida e seu
+ * descendente direito, que pode ser nulo, caso a nó seja folha. */
+int divide_no_ip(int rrnesq, Chave_ip *chave, int desc_dir_rrn){
+
+}
+
+int divide_no_is(int rrnesq, Chave_is *chave, int desc_dir_rrn){
+
+}
+
+/* ==========================================================================
+ * ================================ BUSCAS ==================================
+ * ========================================================================== */
+
+/* Atualiza os dois índices com o novo registro inserido */
+void inserir_registro_indices(Indice *iprimary, Indice *iride, Carona j){
+
+}
+
+/* Percorre a arvore e retorna o RRN da chave informada.  Retorna -1, caso não
+ * encontrada. */
+int buscar_chave_ip(int noderrn, char *pk, int exibir_caminho){
+
+}
+
+/* Percorre a arvore e retorna a pk da string destino/data-hora informada. Retorna -1, caso não
+ * encontrada. */
+char *buscar_chave_is(const int noderrn, const char *titulo, const int exibir_caminho){
+
+}
+
+/* ==========================================================================
+ * =============================== LISTAGEM =================================
+ * ========================================================================== */
+
+/* Lista todos os registros não marcados para remoção */
+void listar(Indice iprimary, Indice iride){
+
+}
+
+/* Realiza percurso em-ordem imprimindo todas as caronas na ordem lexicografica do destino e data/hora e o
+ * nível de cada nó (raiz = nível 1) */
+int imprimir_arvore_is(int noderrn, int nivel){
+
+}
+
+/* Realiza percurso pré-ordem imprimindo as chaves primárias dos registros e o
+ * nível de cada nó (raiz = nível 1) */
+int imprimir_arvore_ip(int noderrn, int nivel){
+
 }

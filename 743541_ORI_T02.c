@@ -9,6 +9,9 @@
  * Aluno: Giovanni Marçon Rossi
  * ========================================================================== */
 
+/* Observação: as funções de Inserção (insere_chave_ip, insere_aux_ip, divide_no_ip, insere_chave_is, insere_aux_is e divide_no is) */
+/* e de Busca (buscar_chave_ip e buscar_chave_is) foram escritas com base no documento arvoreB.pdf fornecido pelo professor Thiago */
+
 /* Bibliotecas */
 #include <stdio.h>
 #include <stdlib.h>
@@ -175,6 +178,9 @@ void criar_carona(Carona *novo);
 /* Insere um novo registro na Árvore B */
 void insere_chave_ip(Indice *iprimary, Chave_ip chave);
 
+/* Insere um novo registro na Árvore-B do indice de rotas */
+void insere_chave_is(Indice *iroute, Chave_is chave);
+
 /* Função auxiliar para ser chamada recursivamente, inserir as novas chaves nas
  * folhas e tratar overflow no retorno da recursão. */
 int insere_aux_ip(int noderrn, Chave_ip *chave);
@@ -210,7 +216,7 @@ int imprimir_arvore_ip(int noderrn, int nivel);
 
 /* Realiza percurso em-ordem imprimindo todas as caronas na ordem lexicografica do destino e data/hora e o
  * nível de cada nó (raiz = nível 1) */
-int imprimir_arvore_is(int noderrn, int nivel);
+int imprimir_arvore_is(int noderrn);
 
 
 /********************FUNÇÕES DO MENU*********************/
@@ -425,17 +431,96 @@ void gerarChave(Carona *novo){
 
 /* Cria o iprimary*/
 void criar_iprimary(Indice *iprimary){
-	// Por enquanto é so isso :P
-	// Quando for fazer teste com arquivos, ou ter que recuperar 1 a 1 do arquivo de dados e inserir eles aqui
 	iprimary->raiz = -1;
-	return;
+	
+	if(nregistros == 0)
+		return;
+	else{
+		Carona aux_carona;
+		Chave_ip aux_chave;
+
+		for(int i = 0; i < nregistros; i++){
+			aux_carona = recuperar_registro(i);
+
+			aux_chave.rrn = i;
+			strcpy(aux_chave.pk, aux_carona.pk);
+
+			insere_chave_ip(iprimary, aux_chave);
+		}
+
+		return;
+	}
 }
 
 /* Cria o índice de Caronas  */
 void criar_iride(Indice *iride){
-	// Mesma coisa da função acima
 	iride->raiz = -1;
-	return;
+
+	if(nregistros == 0)
+		return;
+	else{
+		Carona aux_carona;
+		Chave_is aux_chave;
+		char temp[TAM_TRAJETO];
+		char *atual;
+		char *anterior;
+		int tam;
+
+		for(int i = 0; i < nregistros; i++){
+			aux_carona = recuperar_registro(i);
+
+			strcpy(aux_chave.pk, aux_carona.pk);
+
+			strcpy(temp, aux_carona.trajeto);
+
+			atual = strtok(temp, "|");
+
+			while(1){
+				if(atual == NULL)
+					break;
+				else{
+					anterior = atual;
+					atual = strtok(NULL, "|");
+				}
+			}
+
+			strcpy(aux_chave.string, anterior);
+			tam = strlen(aux_chave.string);
+
+			aux_chave.string[tam] = '$';
+			tam++;
+
+			// Colocando a data invertida
+			aux_chave.string[tam] = aux_carona.data[6];
+			tam++;
+			aux_chave.string[tam] = aux_carona.data[7];
+			tam++;
+			aux_chave.string[tam] = aux_carona.data[3];
+			tam++;
+			aux_chave.string[tam] = aux_carona.data[4];
+			tam++;
+			aux_chave.string[tam] = aux_carona.data[0];
+			tam++;
+			aux_chave.string[tam] = aux_carona.data[1];
+			tam++;
+
+			// Colocando a hora invertida
+			aux_chave.string[tam] = aux_carona.hora[0];
+			tam++;
+			aux_chave.string[tam] = aux_carona.hora[1];
+			tam++;
+			aux_chave.string[tam] = aux_carona.hora[3];
+			tam++;
+			aux_chave.string[tam] = aux_carona.hora[4];
+			tam++;
+
+			aux_chave.string[tam] = '\0';
+
+			insere_chave_is(iride, aux_chave);
+		}
+
+		return;
+	}
 }
 
 /* ==========================================================================
@@ -548,6 +633,79 @@ void write_btree(void *salvar, int rrn, int ip){
 
 		return;
 	}else{
+		
+		node_Btree_is *save = (node_Btree_is *)salvar;
+		
+		char *p_arq_is;
+		char buffer[tamanho_registro_is + 1];
+
+		char num_chaves[4];
+		char buffer_string[TAM_STRING_INDICE];
+		int flag = 0;
+		char rrn_desc[4];
+
+		// Escreve o número de chaves no buffer
+		sprintf(num_chaves, "%.3d", save->num_chaves);
+		strncpy(buffer, num_chaves, 3);
+
+		// Escreve no buffer as chaves e as strings dos registros do nó
+		for(int i = 0; i < (ordem_is - 1); i++){
+			flag = 0;
+			
+			if(i < save->num_chaves){
+				// buffer + qtd_chaves + i*tam_conteudo
+				strncpy((buffer + 3 + (51*i)), save->chave[i].pk, 10);
+
+				//tam = strlen(save->chave[i].string);
+				//strncpy(buffer_string, save->chave[i].string, tam);
+
+				for(int j = 0; j < 41; j++){
+					if(save->chave[i].string[j] == '\0')
+						flag++;
+
+					if(flag)
+						buffer_string[j] = '#';
+					else
+						buffer_string[j] = save->chave[i].string[j];
+				}
+
+				// buffer + qtd_chaves + i*tam_conteudo + TAM_PRIMARY_KEY	
+				strncpy((buffer + 3 + (51*i) + 10), buffer_string, 41);
+			}else{
+				strncpy((buffer + 3 + (51*i)), "###################################################", 51);
+			}
+		}
+		
+		// Escreve no buffer se o nó é folha ou não
+		buffer[3 + ((ordem_is - 1) * 51)] = save->folha;
+
+		// Escreve no buffer os decendentes do nó
+		for(int i = 0; i < ordem_is; i++){
+			if(i < (save->num_chaves+1)){
+				if(save->desc[i] == -1){
+					strncpy((buffer + 3 + ((ordem_is-1) * 51) + 1 + i*3), "***", 3);
+				}else{
+					sprintf(rrn_desc, "%.3d", save->desc[i]);
+					strncpy((buffer + 3 + ((ordem_is-1) * 51) + 1 + i*3), rrn_desc, 3);
+				}
+			}else{
+				strncpy((buffer + 3 + ((ordem_is-1) * 51) + 1 + i*3), "***", 3);
+			}
+		}
+		
+		// Escreve no aquivo de daods do IP o buffer criado
+		// OBS IMPORTANTE nregistrosis só  incrementado APÓS a inserção do registro no aquivo de dados
+		if(nregistrosis == rrn){ 	// Coloca \0
+
+			buffer[tamanho_registro_is] = '\0';
+			p_arq_is = ARQUIVO_IS + (rrn*tamanho_registro_is);
+			strncpy(p_arq_is, buffer, tamanho_registro_is + 1);
+		}else{						// Não coloca \0
+
+			p_arq_is = ARQUIVO_IS + (rrn*tamanho_registro_is);
+			strncpy(p_arq_is, buffer, tamanho_registro_is);
+		}
+
 		return;
 	}
 }
@@ -621,7 +779,64 @@ void *read_btree(int rrn, int ip){
 
 		return novo;
 	}else{
-		return NULL;
+		char *p_arq_is;
+		char buffer[tamanho_registro_is + 1];
+		
+		node_Btree_is *novo;
+		char num_chaves[4];
+		char buffer_string[TAM_STRING_INDICE];
+		char *string;
+		char rrn_desc[4];
+
+		// Alocando espaço para o novo nó
+		novo = (node_Btree_is *)malloc(sizeof(node_Btree_is));
+
+		// Preenchendo o buffer com o registro desejado
+		p_arq_is = ARQUIVO_IS + (rrn*tamanho_registro_is);
+		strncpy(buffer, p_arq_is, tamanho_registro_is);
+		buffer[tamanho_registro_is] = '\0';
+
+		// Colocando o num_chaves em 'novo'
+		num_chaves[0] = buffer[0];
+		num_chaves[1] = buffer[1];
+		num_chaves[2] = buffer[2];
+		num_chaves[3] = '\0';
+
+		novo->num_chaves = atoi(num_chaves);
+
+		// Colocando as chaves e os rrn do registro em 'novo'
+		novo->chave = (Chave_is *)malloc(sizeof(Chave_is) * (ordem_is - 1));
+		
+		for(int i = 0; i < novo->num_chaves; i++){
+			strncpy(novo->chave[i].pk, buffer + 3 + (i * 51), 10);
+			strncpy(buffer_string, buffer + 3 + (i*51) + 10, 41);
+			
+			string = strtok(buffer_string, "#");
+			strcpy(novo->chave[i].string, string);
+		}
+
+		// Colocando o valor do campo folha em 'novo'
+		novo->folha = buffer[3 + ((ordem_is - 1) * 51)];
+
+		// Colocando os valores dos rrn das folhas decendentes
+		novo->desc = (int *)malloc(sizeof(int) * ordem_is);
+
+		for(int i = 0; i < ordem_is; i++){
+			if(buffer[i*3 + (3 + ((ordem_is-1) * 51) + 1)] != '*'){
+
+				// buffer[qtd_chaves + tam_conteudo + indicador_folha + i*tam_rrn_desc + byte_do_rrn]		
+				rrn_desc[0] = buffer[3 + ((ordem_is-1) * 51) + 1 + i*3 + 0];
+				rrn_desc[1] = buffer[3 + ((ordem_is-1) * 51) + 1 + i*3 + 1];
+				rrn_desc[2] = buffer[3 + ((ordem_is-1) * 51) + 1 + i*3 + 2];
+				rrn_desc[3] = '\0';
+
+				novo->desc[i] = atoi(rrn_desc);
+			}else{
+				novo->desc[i] = -1;
+			}
+		}
+
+		return novo;
 	}
 }
 
@@ -649,7 +864,24 @@ void *criar_no(int ip){
 
 		return novo;
 	}else{
-		return NULL;
+		node_Btree_is *novo;
+		novo = (node_Btree_is *)malloc(sizeof(node_Btree_is));
+
+		novo->num_chaves = 0;
+
+		// Alocando memória para as chaves do nó
+		novo->chave = (Chave_is *)malloc(sizeof(Chave_is) * (ordem_is - 1));
+
+		novo->folha = '?';
+
+		// Alocando memória para os decendentes do nó
+		novo->desc = (int *)malloc(sizeof(int) * ordem_is);
+
+		for(int i = 0; i < ordem_is; i++){
+			novo->desc[i] = -1;
+		}
+
+		return novo;
 	}
 }
 
@@ -668,6 +900,14 @@ void libera_no(void *node, int ip){
 
 		return;
 	}else{
+		node_Btree_is *aux;
+
+		aux = (node_Btree_is *)node;
+
+		free(aux->chave);
+		free(aux->desc);
+		free(aux);
+
 		return;
 	}
 }
@@ -695,19 +935,73 @@ void cadastrar(Indice *iprimary, Indice *iride){
 }
 
 int alterar(Indice iprimary){
+	char pk[TAM_PRIMARY_KEY];
+	char nvagas[2];
+	
+	int n_vag = 0;
+	int rrn = 0;
 
+	scanf("%[^\n]%*c", pk);
+
+	rrn = buscar_chave_ip(iprimary.raiz, pk, 0);
+
+	if(rrn == -1){
+		printf(REGISTRO_N_ENCONTRADO);
+		return 0;
+	}else{
+
+		scanf("%d%*c", &n_vag);
+	
+		while(1){							// Checando se o campo isnerido respeita as regras
+			if(n_vag > 9 || n_vag < 0){
+				printf(CAMPO_INVALIDO);
+				scanf("%d%*c", &n_vag);
+			}else{
+				sprintf(nvagas, "%d", n_vag);
+				break;
+			}
+		}
+
+		char buffer[TAM_REGISTRO + 1];		// Criando um buffer para inserir no arquivo
+		char *p_arq;
+
+		p_arq = ARQUIVO + (rrn * TAM_REGISTRO);
+
+		strncpy(buffer, p_arq, TAM_REGISTRO);	// Recuperando o registro
+
+		buffer[TAM_REGISTRO] = '\0';
+
+		for(int i = TAM_REGISTRO; i > 0; i--){	// Encontrando o lugar no buffer em que o registro deve ser inserido
+			if(buffer[i] == '@'){
+				buffer[i - 1] = nvagas[0];
+				break;
+			}
+		}
+
+		strncpy(p_arq, buffer, TAM_REGISTRO);	// Colocando o buffer no arquivo de dados
+
+		return 1;
+	}
 }
 
 void buscar(Indice iprimary, Indice iride){
 	int opcao;
-	
+
 	char pk[TAM_PRIMARY_KEY];
 	int rrn;
+
+	char local[31];
+	char data[TAM_DATA];
+	char hora[TAM_HORA];
+	char buffer[TAM_STRING_INDICE];
+	int tam;
+	char *pk_encontrada;
 
 	scanf("%d%*c", &opcao);
 
 	switch (opcao){
 	case 1:
+		
 		scanf("%[^\n]%*c", pk);
 		
 		printf("Busca por %s. Nos percorridos:\n", pk);
@@ -722,6 +1016,53 @@ void buscar(Indice iprimary, Indice iride){
 		break;
 	
 	case 2:
+
+		scanf("%[^\n]%*c", local);
+		scanf("%[^\n]%*c", data);
+		scanf("%[^\n]%*c", hora);
+		
+		strcpy(buffer, local);
+		tam = strlen(buffer);
+
+		buffer[tam] = '$';
+		tam++;
+
+		// Colocando a data invertida
+		buffer[tam] = data[6];
+		tam++;
+		buffer[tam] = data[7];
+		tam++;
+		buffer[tam] = data[3];
+		tam++;
+		buffer[tam] = data[4];
+		tam++;
+		buffer[tam] = data[0];
+		tam++;
+		buffer[tam] = data[1];
+		tam++;
+
+		// Colocando a hora invertida
+		buffer[tam] = hora[0];
+		tam++;
+		buffer[tam] = hora[1];
+		tam++;
+		buffer[tam] = hora[3];
+		tam++;
+		buffer[tam] = hora[4];
+		tam++;
+
+		buffer[tam] = '\0';
+		printf("Busca por %s.\nNos percorridos:\n", buffer);
+
+		pk_encontrada = buscar_chave_is(iride.raiz, buffer, 1);
+		printf("\n");
+
+		if(strcmp(pk_encontrada, "++++++++++") != 0){
+			rrn = buscar_chave_ip(iprimary.raiz, pk_encontrada, 0);
+			free(pk_encontrada);
+			exibir_registro(rrn);
+		}else
+			printf(REGISTRO_N_ENCONTRADO);
 
 		break;
 	}
@@ -740,7 +1081,9 @@ void listar(Indice iprimary, Indice iride){
 			break;
 
 		case 2:
-			imprimir_arvore_is(iride.raiz, 1);
+			if(!imprimir_arvore_is(iride.raiz)){
+				printf(REGISTRO_N_ENCONTRADO);
+			}
 			break;
 	}
 }
@@ -777,6 +1120,63 @@ void inserir_registro_indices(Indice *iprimary, Indice *iride, Carona j){
 
 	insere_chave_ip(iprimary, add_ip);
 
+	Chave_is add_is;
+
+	char temp[TAM_TRAJETO];
+	char *atual;
+	char *anterior;
+	int tam;
+
+	strcpy(add_is.pk, j.pk);
+	strcpy(temp, j.trajeto);
+
+	atual = strtok(temp, "|");
+
+	while(1){
+		if(atual == NULL)
+			break;
+		else{
+			anterior = atual;
+			atual = strtok(NULL, "|");
+		}
+	}
+
+	strcpy(add_is.string, anterior);
+	tam = strlen(add_is.string);
+
+	add_is.string[tam] = '$';
+	tam++;
+
+	// Colocando a data invertida
+	add_is.string[tam] = j.data[6];
+	tam++;
+	add_is.string[tam] = j.data[7];
+	tam++;
+	add_is.string[tam] = j.data[3];
+	tam++;
+	add_is.string[tam] = j.data[4];
+	tam++;
+	add_is.string[tam] = j.data[0];
+	tam++;
+	add_is.string[tam] = j.data[1];
+	tam++;
+
+	// Colocando a hora invertida
+	add_is.string[tam] = j.hora[0];
+	tam++;
+	add_is.string[tam] = j.hora[1];
+	tam++;
+	add_is.string[tam] = j.hora[3];
+	tam++;
+	add_is.string[tam] = j.hora[4];
+	tam++;
+
+	add_is.string[tam] = '\0';
+
+
+	insere_chave_is(iride, add_is);
+
+
 	char buffer[TAM_REGISTRO + 1];
 	char *pos_arq = ARQUIVO + (nregistros*TAM_REGISTRO);	//Coloca o ponteiro para onde o registro será inserido no arquivo de dados
 	construir_buffer(buffer, &j);
@@ -787,7 +1187,7 @@ void inserir_registro_indices(Indice *iprimary, Indice *iride, Carona j){
 	return;
 }
 
-/* Insere um novo registro na Árvore B */
+/* Insere um novo registro na Árvore-B do indice primário */
 void insere_chave_ip(Indice *iprimary, Chave_ip chave){
 	// Caso a árvore esteja vazia
 	if(iprimary->raiz == -1){
@@ -832,6 +1232,57 @@ void insere_chave_ip(Indice *iprimary, Chave_ip chave){
 			libera_no(novo, 1);
 
 			nregistrosip++;
+		}
+
+		return;
+	}
+}
+
+/* Insere um novo registro na Árvore-B do indice de rotas */
+/* OBS - para checar se um retorno da recurão é nulo, a chave primária foi substituida por "++++++++++" */
+void insere_chave_is(Indice *iroute, Chave_is chave){
+	if(iroute->raiz == -1){
+		node_Btree_is *novo;
+
+		novo = (node_Btree_is *)criar_no(0);
+		
+		novo->folha = 'T';
+		novo->num_chaves = 1;
+		strcpy(novo->chave[0].string, chave.string);
+		strcpy(novo->chave[0].pk, chave.pk);
+
+		iroute->raiz = nregistrosis;
+
+		write_btree(novo, nregistrosis, 0);
+
+		libera_no(novo, 0);
+
+		nregistrosis++;
+		return;
+	}else{
+		int rrn_filho_dir;
+		rrn_filho_dir = insere_aux_is(iroute->raiz, &chave);
+
+		if(strcmp(chave.pk, "++++++++++") != 0){
+			node_Btree_is *novo;
+
+			novo = (node_Btree_is *)criar_no(0);
+			
+			novo->folha = 'F';
+			novo->num_chaves = 1;
+			strcpy(novo->chave[0].string, chave.string);
+			strcpy(novo->chave[0].pk, chave.pk);
+			
+			novo->desc[0] = iroute->raiz;
+			novo->desc[1] = rrn_filho_dir;
+
+			iroute->raiz = nregistrosis;
+
+			write_btree(novo, nregistrosis, 0);
+
+			libera_no(novo, 0);
+
+			nregistrosis++;
 		}
 
 		return;
@@ -917,7 +1368,79 @@ int insere_aux_ip(int noderrn, Chave_ip *chave){
 }
 
 int insere_aux_is(int noderrn, Chave_is *chave){
+	node_Btree_is *no;
 
+	no = (node_Btree_is *)read_btree(noderrn, 0);
+
+	if(no->folha == 'T'){
+		if(no->num_chaves < ordem_is - 1){
+			int i = no->num_chaves - 1;
+
+			while(i >= 0 && strcmp(chave->string, no->chave[i].string) < 0){
+				strcpy(no->chave[i+1].pk, no->chave[i].pk);
+				strcpy(no->chave[i+1].string, no->chave[i].string);
+				i--;
+			}
+
+			strcpy(no->chave[i+1].pk, chave->pk);
+			strcpy(no->chave[i+1].string, chave->string);
+
+			no->num_chaves++;
+
+			write_btree(no, noderrn, 0);
+
+			libera_no(no, 0);
+			
+			strcpy(chave->pk, "++++++++++");
+			return -1;
+
+		}else{
+			libera_no(no, 0);
+			return divide_no_is(noderrn, chave, -1);
+		}
+	}else{
+		int i = no->num_chaves - 1;
+		int rrn_filho_dir;
+
+		while(i >= 0 && strcmp(chave->string, no->chave[i].string) < 0)
+			i--;
+		
+		i++;
+
+		rrn_filho_dir = insere_aux_is(no->desc[i], chave);
+
+		if(strcmp(chave->pk, "++++++++++") != 0){
+			if(no->num_chaves < ordem_is - 1){
+				i = no->num_chaves - 1;
+
+				while(i >= 0 && strcmp(chave->string, no->chave[i].string) < 0){
+					strcpy(no->chave[i+1].pk, no->chave[i].pk);
+					strcpy(no->chave[i+1].string, no->chave[i].string);
+					no->desc[i+2] = no->desc[i+1];
+					i--;
+				}
+
+				strcpy(no->chave[i+1].pk, chave->pk);
+				strcpy(no->chave[i+1].string, chave->string);
+				no->desc[i+2] = rrn_filho_dir;
+
+				no->num_chaves++;
+
+				write_btree(no, noderrn, 0);
+
+				libera_no(no, 0);
+
+				strcpy(chave->pk, "++++++++++");
+				return -1;
+			}else{
+				libera_no(no, 0);
+				return divide_no_is(noderrn, chave, rrn_filho_dir);
+			}
+		}else{
+			libera_no(no, 0);
+			return -1;
+		}
+	}
 }
 
 /* Função auxiliar que ordena as chaves em esq + a chave a ser inserida e divide
@@ -980,7 +1503,59 @@ int divide_no_ip(int rrnesq, Chave_ip *chave, int desc_dir_rrn){
 }
 
 int divide_no_is(int rrnesq, Chave_is *chave, int desc_dir_rrn){
+	node_Btree_is *no;
+	node_Btree_is *novo;
 
+	no = (node_Btree_is *)read_btree(rrnesq, 0);
+	novo = (node_Btree_is *)criar_no(0);
+
+	int i = no->num_chaves - 1;
+	int chave_alocada = 0;
+
+	novo->folha = no->folha;
+	novo->num_chaves = (ordem_is-1)/2;
+
+	for(int j = (novo->num_chaves-1); j >= 0; j--){
+		if(!chave_alocada && strcmp(chave->string, no->chave[i].string) > 0){
+			strcpy(novo->chave[j].pk, chave->pk);
+			strcpy(novo->chave[j].string, chave->string);
+			novo->desc[j+1] = desc_dir_rrn;
+			chave_alocada = 1;
+		}else{
+			strcpy(novo->chave[j].pk, no->chave[i].pk);
+			strcpy(novo->chave[j].string, no->chave[i].string);
+			novo->desc[j+1] = no->desc[i+1];
+			i--;
+		}
+	}
+
+	if(!chave_alocada){
+		while(i >= 0 && strcmp(chave->string, no->chave[i].string) < 0){
+			strcpy(no->chave[i+1].pk, no->chave[i].pk);
+			strcpy(no->chave[i+1].string, no->chave[i].string);
+			no->desc[i+2] = no->desc[i+1];
+			i--;
+		}
+
+		strcpy(no->chave[i+1].pk, chave->pk);
+		strcpy(no->chave[i+1].string, chave->string);
+		no->desc[i+2] = desc_dir_rrn;
+	}
+
+	strcpy(chave->pk, no->chave[(ordem_is/2)].pk);
+	strcpy(chave->string, no->chave[(ordem_is/2)].string);
+	novo->desc[0] = no->desc[(ordem_is/2) + 1];
+	no->num_chaves = ordem_is/2;
+
+	write_btree(no, rrnesq, 0);
+	write_btree(novo, nregistrosis, 0);
+
+	nregistrosis++;
+
+	libera_no(no, 0);
+	libera_no(novo, 0);
+
+	return nregistrosis - 1;
 }
 
 /* ==========================================================================
@@ -991,6 +1566,7 @@ int divide_no_is(int rrnesq, Chave_is *chave, int desc_dir_rrn){
  * encontrada. */
 int buscar_chave_ip(int noderrn, char *pk, int exibir_caminho){
 	node_Btree_ip *no;
+	int rrn;
 	
 	if(noderrn == -1)
 		return -1;
@@ -1011,83 +1587,62 @@ int buscar_chave_ip(int noderrn, char *pk, int exibir_caminho){
 	while(i < no->num_chaves && strcmp(pk, no->chave[i].pk) > 0)
 		i++;
 
-	if(i <= no->num_chaves && strcmp(pk, no->chave[i].pk) == 0)
-		return no->chave[i].rrn;
+	if(i <= no->num_chaves && strcmp(pk, no->chave[i].pk) == 0){
+		rrn = no->chave[i].rrn;
+		libera_no(no, 1);
+		return rrn;
+	}
 	
-	if(no->folha == 'T')
+	if(no->folha == 'T'){
+		libera_no(no, 1);
 		return -1;
-	else
-		return buscar_chave_ip(no->desc[i], pk, exibir_caminho);
-	
-	
-	// node_Btree_ip* no;
-	// int rrn_encontrado = -1;
-
-	// if(noderrn == -1)
-	// 	return -1;
-
-	// no = (node_Btree_ip *)read_btree(noderrn, 1);
-
-
-	// //imprime o nó antes de continuar a busca
-	// if(exibir_caminho){
-	// 	printf("%s", no->chave[0].pk);
-	// 	for(int i = 1; i < no->num_chaves; i++){
-	// 		printf(", %s", no->chave[i].pk);
-	// 	}
-	// 	printf("\n");
-	// }
-	
-	// if(no->folha == 'T'){
-	// 	for(int i = 0; i < no->num_chaves; i++){
-			
-	// 		if(strcmp(no->chave[i].pk, pk) == 0){
-	// 			rrn_encontrado = no->chave[i].rrn;
-	// 			libera_no(no, 1);
-	// 			return rrn_encontrado;
-	// 		}			
-	// 	}
-
-	// 	return rrn_encontrado;
-
-	// }else{
-	// 	for(int i = 0; i < no->num_chaves; i++){
-			
-	// 		if(strcmp(no->chave[i].pk, pk) == 0){
-	// 			rrn_encontrado = no->chave[i].rrn;
-	// 			libera_no(no, 1);
-	// 			printf("era p parar aqui\n");
-	// 			return rrn_encontrado;
-	// 		} 
-			
-	// 		if(i == 0 && strcmp(no->chave[i].pk, pk) > 0){
-	// 			// Desce mais para a esquerda
-	// 			noderrn = no->desc[0];
-	// 			libera_no(no, 1);
-	// 			return buscar_chave_ip(noderrn ,pk, exibir_caminho);
-	// 		}
-
-	// 		if(i == (no->num_chaves-1)){
-	// 			// Desce no mais para a direita
-	// 			noderrn = no->desc[no->num_chaves-1];
-	// 			libera_no(no, 1);
-	// 			return buscar_chave_ip(noderrn, pk, exibir_caminho);
-	// 		}
-
-	// 		if(strcmp(no->chave[i].pk, pk) < 0 && strcmp(no->chave[i+1].pk, pk) > 0){
-	// 			// Entra no meio de i e i + 1
-	// 			noderrn = no->desc[i+1];
-	// 			libera_no(no, 1);
-	// 			return buscar_chave_ip(noderrn, pk, exibir_caminho);
-	// 		}			
-	// 	}
-	// }
+	}else{
+		rrn = buscar_chave_ip(no->desc[i], pk, exibir_caminho);
+		libera_no(no, 1);
+		return rrn;
+	}
 }
 
 /* Percorre a arvore e retorna a pk da string destino/data-hora informada. Retorna -1, caso não
  * encontrada. */
 char *buscar_chave_is(const int noderrn, const char *titulo, const int exibir_caminho){
+	node_Btree_is *no;
+	
+	if(noderrn == -1)
+		return "++++++++++";
 
+	no = (node_Btree_is *)read_btree(noderrn, 0);
+
+	//imprime o nó antes de continuar a busca
+	if(exibir_caminho){
+		printf("%s", no->chave[0].string);
+		for(int i = 1; i < no->num_chaves; i++){
+			printf(", %s", no->chave[i].string);
+		}
+		printf("\n");
+	}
+
+	int i = 0;
+
+	while(i < no->num_chaves && strcmp(titulo, no->chave[i].string) > 0)
+		i++;
+
+	if(i <= no->num_chaves && strcmp(titulo, no->chave[i].string) == 0){
+		char *pk = (char *)malloc(sizeof(char)*TAM_PRIMARY_KEY);
+		strcpy(pk, no->chave[i].pk);
+		libera_no(no, 0);
+		return pk;
+	}
+	
+	if(no->folha == 'T'){
+		libera_no(no, 0);
+		return "++++++++++";
+	}else{
+		char *pk = (char *)malloc(sizeof(char)*TAM_PRIMARY_KEY);
+		strcpy(pk, buscar_chave_is(no->desc[i], titulo, exibir_caminho));
+		libera_no(no, 0);
+		return pk;
+	}
 }
 
 /* ==========================================================================
@@ -1124,8 +1679,70 @@ int imprimir_arvore_ip(int noderrn, int nivel){
 	return 1;
 }
 
-/* Realiza percurso em-ordem imprimindo todas as caronas na ordem lexicografica do destino e data/hora e o
- * nível de cada nó (raiz = nível 1) */
-int imprimir_arvore_is(int noderrn, int nivel){
+/* Realiza percurso em-ordem imprimindo todas as caronas na ordem lexicografica do destino e data/hora */
+int imprimir_arvore_is(int noderrn){
+	node_Btree_is *no;
+	char buffer_lista[49];
+	int tam;
 
+	// Checando se a árvore tem raiz
+	if(noderrn == -1)
+		return 0;
+
+	no = (node_Btree_is *)read_btree(noderrn, 0);
+
+	for(int i = 0; i < no->num_chaves; i++){
+		if(no->desc[i] != -1)
+			imprimir_arvore_is(no->desc[i]);
+		
+		// Construindo a linha que será exibida
+		for(int j = 0; 1; j++){
+			if(no->chave[i].string[j] == '$'){
+				buffer_lista[j] = '\0';
+				break;
+			}else
+				buffer_lista[j] = no->chave[i].string[j];
+		}
+
+		tam = strlen(buffer_lista);
+
+		for(int j = tam; j < 30; j++)
+			buffer_lista[j] = '-';
+
+		buffer_lista[30] = ' ';
+
+		// Inserindo a data
+		buffer_lista[31] = no->chave[i].string[tam+5];
+		buffer_lista[32] = no->chave[i].string[tam+6];
+		buffer_lista[33] = '/';
+		buffer_lista[34] = no->chave[i].string[tam+3];
+		buffer_lista[35] = no->chave[i].string[tam+4];
+		buffer_lista[36] = '/';
+		buffer_lista[37] = no->chave[i].string[tam+1];
+		buffer_lista[38] = no->chave[i].string[tam+2];
+
+		// Separador			
+		buffer_lista[39] = ' ';
+		buffer_lista[40] = '-';
+		buffer_lista[41] = ' ';
+		
+		// Inserindo a hora
+		buffer_lista[42] = no->chave[i].string[tam+7];
+		buffer_lista[43] = no->chave[i].string[tam+8];
+		buffer_lista[44] = ':';
+		buffer_lista[45] = no->chave[i].string[tam+9];
+		buffer_lista[46] = no->chave[i].string[tam+10];
+		buffer_lista[47] = '-';
+		buffer_lista[48] = '\0';
+
+		printf("%s\n", buffer_lista);
+	}
+
+	// Manda a recurção para o decendente mais a direita
+	if(no->desc[no->num_chaves] != -1)
+		imprimir_arvore_is(no->desc[no->num_chaves]);
+
+	libera_no(no, 0);
+
+	return 1;
 }
